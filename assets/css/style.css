@@ -1,0 +1,147 @@
+/* Overlay */
+.glcp-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    /* Nền mờ */
+    z-index: 9999;
+}
+
+
+/* Popup */
+.glcp-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Căn giữa tuyệt đối */
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    /* Bóng đổ */
+    max-width: 400px;
+    width: 90%;
+    /* Responsive */
+    text-align: center;
+    z-index: 10000;
+}
+
+/* Nút đóng */
+.glcp-popup-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    color: #333;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.glcp-popup-close:hover {
+    color: #e74c3c;
+    /* Màu đỏ khi hover */
+}
+
+/* Nội dung */
+.glcp-popup-content h3 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    color: #333;
+}
+
+.glcp-popup-content p {
+    margin: 0 0 20px;
+    font-size: 16px;
+    color: #666;
+}
+
+/* Nút CTA */
+.glcp-popup-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #e74c3c;
+    /* Màu đỏ nổi bật */
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.glcp-popup-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #e74c3c;
+    /* Màu đỏ nổi bật */
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+
+/* Responsive */
+@media (max-width: 768px) {
+
+    .glcp-schedule-table th,
+    .glcp-schedule-table td {
+        padding: 10px;
+        font-size: 14px;
+    }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .glcp-popup {
+        max-width: 300px;
+        padding: 15px;
+    }
+
+    .glcp-popup-content h3 {
+        font-size: 20px;
+    }
+
+    .glcp-popup-content p {
+        font-size: 14px;
+    }
+}
+
+.glcp-form input {
+    display: block;
+    margin: 10px auto;
+    padding: 5px;
+    width: 200px;
+}
+
+.glcp-cta {
+    padding: 10px 20px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+.glcp-schedule,
+.glcp-testimonials {
+    text-align: center;
+    padding: 20px;
+}
+
+.schedule-item,
+.testimonial-item {
+    margin: 10px 0;
+}
+
+#glcp-popup {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ccc;
+}
