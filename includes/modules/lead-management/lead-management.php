@@ -9,24 +9,8 @@ function glp_lead_management_init()
     add_shortcode('gym_lead_form', 'glp_render_lead_form');
     add_action('admin_post_nopriv_glp_lead_submit', 'glp_handle_lead_submit');
     add_action('admin_post_glp_lead_submit', 'glp_handle_lead_submit');
-
-    // Thêm submenu page thông qua class core
-    add_action('admin_menu', 'glp_register_lead_submenu', 20);
 }
 add_action('init', 'glp_lead_management_init');
-
-// Đăng ký submenu trong menu chính
-function glp_register_lead_submenu()
-{
-    add_submenu_page(
-        'gym-landing-settings', // Slug của menu chính
-        'Quản lý Lead',
-        'Quản lý Lead',
-        'manage_options',
-        'gym-landing-leads',
-        'glp_render_leads_admin_page'
-    );
-}
 
 // Hiển thị form lead frontend
 function glp_render_lead_form()

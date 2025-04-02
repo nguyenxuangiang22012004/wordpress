@@ -19,15 +19,13 @@ $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'leads';
 
     <?php
     if ($active_tab == 'leads') {
-        glp_render_leads_admin_page(); // Sửa tên hàm
+        glp_render_leads_admin_page();
     } elseif ($active_tab == 'popup') {
         glcp_popup_offers_admin();
     } elseif ($active_tab == 'schedule') {
         glcp_class_schedule_admin();
     } elseif ($active_tab == 'testimonials') {
         glcp_testimonials_admin();
-    } elseif ($active_tab == 'analytics') {
-        glp_analytics_tracking_admin();
     }
     ?>
 </div>
