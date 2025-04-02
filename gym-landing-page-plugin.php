@@ -15,6 +15,7 @@ define('GLP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Load core class
 require_once GLP_PLUGIN_DIR . 'includes/class-glp-core.php';
+require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
 
 // Khởi tạo plugin
 class GymLandingPlugin

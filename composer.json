@@ -1,0 +1,17 @@
+{
+    "name": "vendor/excel",
+    "autoload": {
+        "psr-4": {
+            "Vendor\\Excel\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "nguyenxuangiang22012004",
+            "email": "nguyenxuangiang22012004@gmail.com"
+        }
+    ],
+    "require": {
+        "phpoffice/phpspreadsheet": "^4.1"
+    }
+}
