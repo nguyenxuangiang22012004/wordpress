@@ -47,11 +47,12 @@ function glcp_class_schedule_admin()
                 <table class="widefat fixed" id="glcp-schedule-table">
                     <thead>
                         <tr>
-                            <th width="20%">Tên Lớp</th>
-                            <th width="15%">Loại Lớp</th>
-                            <th width="20%">Thời Gian</th>
-                            <th width="25%">Huấn Luyện Viên</th>
-                            <th width="20%">Hành Động</th>
+                            <th width="15%">Tên Lớp</th>
+                            <th width="10%">Loại Lớp</th>
+                            <th width="15%">Thời Gian</th>
+                            <th width="15%">Huấn Luyện Viên</th>
+                            <th width="30%">Kinh Nghiệm HLV</th>
+                            <th width="15%">Hành Động</th>
                         </tr>
                     </thead>
                     <tbody id="glcp-schedule-rows">
@@ -66,7 +67,10 @@ function glcp_class_schedule_admin()
                                         </select>
                                     </td>
                                     <td><input type="text" class="regular-text" name="schedule[<?php echo $index; ?>][time]" value="<?php echo esc_attr($class['time'] ?? ''); ?>" placeholder="VD: Thứ 2,4,6 - 18:00-19:00" required></td>
-                                    <td><input type="text" class="regular-text" name="schedule[<?php echo $index; ?>][trainer]" value="<?php echo esc_attr($class['trainer'] ?? ''); ?>" placeholder="Tên huấn luyện viên" required></td>
+                                    <td><input type="text" class="regular-text" name="schedule[<?php echo $index; ?>][trainer]" value="<?php echo esc_attr($class['trainer'] ?? ''); ?>" placeholder="Tên HLV" required></td>
+                                    <td>
+                                        <textarea name="schedule[<?php echo $index; ?>][experience]" class="regular-text" rows="2" placeholder="Mô tả kinh nghiệm HLV"><?php echo esc_textarea($class['experience'] ?? ''); ?></textarea>
+                                    </td>
                                     <td>
                                         <form method="post" style="display:inline;">
                                             <?php wp_nonce_field('glcp_delete_class_action', 'glcp_delete_class_nonce'); ?>
@@ -86,7 +90,10 @@ function glcp_class_schedule_admin()
                                     </select>
                                 </td>
                                 <td><input type="text" class="regular-text" name="schedule[0][time]" value="" placeholder="VD: Thứ 2,4,6 - 18:00-19:00" required></td>
-                                <td><input type="text" class="regular-text" name="schedule[0][trainer]" value="" placeholder="Tên huấn luyện viên" required></td>
+                                <td><input type="text" class="regular-text" name="schedule[0][trainer]" value="" placeholder="Tên HLV" required></td>
+                                <td>
+                                    <textarea name="schedule[0][experience]" class="regular-text" rows="2" placeholder="Mô tả kinh nghiệm HLV"></textarea>
+                                </td>
                                 <td></td>
                             </tr>
                         <?php endif; ?>
@@ -112,7 +119,8 @@ function glcp_class_schedule_admin()
                     '<option value="paid">Trả phí</option>' +
                     '</select></td>' +
                     '<td><input type="text" class="regular-text" name="schedule[' + rowCount + '][time]" value="" placeholder="VD: Thứ 2,4,6 - 18:00-19:00" required></td>' +
-                    '<td><input type="text" class="regular-text" name="schedule[' + rowCount + '][trainer]" value="" placeholder="Tên huấn luyện viên" required></td>' +
+                    '<td><input type="text" class="regular-text" name="schedule[' + rowCount + '][trainer]" value="" placeholder="Tên HLV" required></td>' +
+                    '<td><textarea name="schedule[' + rowCount + '][experience]" class="regular-text" rows="2" placeholder="Mô tả kinh nghiệm HLV"></textarea></td>' +
                     '<td></td>' +
                     '</tr>';
                 $('#glcp-schedule-rows').append(newRow);

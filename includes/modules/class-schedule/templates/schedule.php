@@ -1,7 +1,7 @@
 <div class="container py-4">
     <div class="card shadow-sm" style="background-color: #FFFFFF; border: none;">
         <div class="card-header text-center" style="background-color: #FFFFFF; border-bottom: 2px solid #d4a373;">
-            <h2 class="mb-0" style="color: #6c757d; font-weight: bold;">LỊCH HỌC</h2>
+            <h2 class="mb-0" style="color: #6c757d; font-weight: bold;">LỊCH TẬP GYM</h2>
         </div>
         <div class="card-body">
             <?php if (!empty($schedule)): ?>
@@ -9,10 +9,11 @@
                     <table class="table table-bordered table-hover text-center" style="background-color: #f8f9fa; border-color: #d4a373;">
                         <thead style="background-color: #d4a373;">
                             <tr>
-                                <th scope="col" style="color: white; width: 25%;">TÊN LỚP</th>
-                                <th scope="col" style="color: white; width: 15%;">LOẠI LỚP</th>
-                                <th scope="col" style="color: white; width: 30%;">THỜI GIAN</th>
-                                <th scope="col" style="color: white; width: 30%;">HUẤN LUYỆN VIÊN</th>
+                                <th scope="col" style="color: white;">TÊN LỚP</th>
+                                <th scope="col" style="color: white;">LOẠI LỚP</th>
+                                <th scope="col" style="color: white;">THỜI GIAN</th>
+                                <th scope="col" style="color: white;">HUẤN LUYỆN VIÊN</th>
+                                <th scope="col" style="color: white;">KINH NGHIỆM</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -31,6 +32,9 @@
                                         </td>
                                         <td style="color: #d4a373; font-weight: 500;">
                                             <i class="fas fa-user-tie me-2"></i><?php echo esc_html($class['trainer']); ?>
+                                        </td>
+                                        <td style="color: #6c757d; text-align: left;">
+                                            <small><?php echo esc_html($class['experience']); ?></small>
                                         </td>
                                     </tr>
                             <?php endif;
