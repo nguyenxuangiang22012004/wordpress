@@ -19,7 +19,7 @@ $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'leads';
 
     <?php
     if ($active_tab == 'leads') {
-        glcp_lead_management_admin();
+        glp_render_leads_admin_page(); // Sửa tên hàm
     } elseif ($active_tab == 'popup') {
         glcp_popup_offers_admin();
     } elseif ($active_tab == 'schedule') {
@@ -27,7 +27,7 @@ $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'leads';
     } elseif ($active_tab == 'testimonials') {
         glcp_testimonials_admin();
     } elseif ($active_tab == 'analytics') {
-        glcp_analytics_tracking_admin();
+        glp_analytics_tracking_admin();
     }
     ?>
 </div>
