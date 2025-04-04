@@ -49,6 +49,7 @@ class GymLandingPlugin
             'popup-offers' => GLP_PLUGIN_DIR . 'includes/modules/popup-offers/popup-offers.php',
             'class-schedule' => GLP_PLUGIN_DIR . 'includes/modules/class-schedule/class-schedule.php',
             'testimonials' => GLP_PLUGIN_DIR . 'includes/modules/testimonials/testimonials.php',
+            'product-management' => GLP_PLUGIN_DIR . 'includes/modules/product-management/product-management.php',
             'analytics-tracking' => GLP_PLUGIN_DIR . 'includes/modules/analytics-tracking/analytics-tracking.php',
         );
 
