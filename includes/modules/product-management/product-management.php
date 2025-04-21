@@ -3,6 +3,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Import namespaces của PhpSpreadsheet
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 // Khởi tạo module product management
 function glp_product_management_init()
 {
@@ -20,6 +24,9 @@ function glp_product_management_init()
     add_action('wp_ajax_nopriv_glp_remove_from_cart', 'glp_remove_from_cart');
     add_action('wp_ajax_glp_update_cart_quantity', 'glp_update_cart_quantity');
     add_action('wp_ajax_nopriv_glp_update_cart_quantity', 'glp_update_cart_quantity');
+
+    // Thêm action cho export orders
+    add_action('admin_post_glp_export_orders', 'glp_handle_export_orders');
 }
 add_action('init', 'glp_product_management_init');
 
@@ -215,6 +222,86 @@ function glp_handle_order_submit()
     exit;
 }
 
+// Xử lý export đơn hàng sang Excel
+function glp_handle_export_orders()
+{
+    // Kiểm tra nonce
+    if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'glp_export_orders_action')) {
+        wp_die('Yêu cầu không hợp lệ.');
+    }
+
+    // Kiểm tra quyền truy cập
+    if (!current_user_can('manage_options')) {
+        wp_die('Bạn không có quyền thực hiện hành động này.');
+    }
+
+    $orders = get_option('glp_orders', array());
+
+    if (!empty($orders)) {
+        // Tạo spreadsheet mới
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Đặt tiêu đề cột
+        $sheet->setCellValue('A1', 'STT');
+        $sheet->setCellValue('B1', 'Sản Phẩm');
+        $sheet->setCellValue('C1', 'Tổng Tiền (VNĐ)');
+        $sheet->setCellValue('D1', 'Tên Khách Hàng');
+        $sheet->setCellValue('E1', 'Số Điện Thoại');
+        $sheet->setCellValue('F1', 'Địa Chỉ');
+        $sheet->setCellValue('G1', 'Ngày Đặt');
+        $sheet->setCellValue('H1', 'Trạng Thái');
+
+        // Điền dữ liệu
+        $row = 2;
+        foreach ($orders as $index => $order) {
+            $sheet->setCellValue('A' . $row, $index + 1);
+
+            // Danh sách sản phẩm
+            $product_list = [];
+            foreach ($order['products'] as $item) {
+                $product_list[] = "{$item['name']} (x{$item['quantity']})";
+            }
+            $sheet->setCellValue('B' . $row, implode(', ', $product_list));
+
+            // Tổng tiền
+            $total_price = 0;
+            foreach ($order['products'] as $item) {
+                $total_price += $item['price'] * $item['quantity'];
+            }
+            $sheet->setCellValue('C' . $row, number_format($total_price, 0, ',', '.'));
+
+            $sheet->setCellValue('D' . $row, $order['customer_name']);
+            $sheet->setCellValue('E' . $row, $order['customer_phone']);
+            $sheet->setCellValue('F' . $row, $order['customer_address']);
+            $sheet->setCellValue('G' . $row, date('d/m/Y H:i', strtotime($order['date'])));
+            $sheet->setCellValue('H' . $row, $order['status'] === 'new' ? 'Mới' : ($order['status'] === 'contacted' ? 'Đã liên hệ' : 'Đã chốt'));
+            $row++;
+        }
+
+        // Tạo file Excel và gửi về trình duyệt
+        $writer = new Xlsx($spreadsheet);
+        $filename = 'don-hang-' . date('Y-m-d-H-i-s') . '.xlsx';
+
+        // Đặt header để tải file
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Cache-Control: cache, must-revalidate');
+        header('Pragma: public');
+
+        // Ghi file và thoát
+        $writer->save('php://output');
+        exit;
+    } else {
+        // Nếu không có đơn hàng, redirect về trang trước với thông báo
+        wp_redirect(add_query_arg('export_error', 'no_orders', wp_get_referer()));
+        exit;
+    }
+}
+
 // Hiển thị trang quản lý sản phẩm trong admin
 function glp_render_products_admin_page()
 {
@@ -377,6 +464,7 @@ function glp_render_products_admin_page()
 // Hiển thị trang quản lý đơn hàng trong admin
 function glp_render_orders_admin_page()
 {
+    // Xử lý xóa đơn hàng
     if (isset($_POST['glp_delete_order']) && check_admin_referer('glp_delete_order_action')) {
         $orders = get_option('glp_orders', array());
         $index = intval($_POST['order_index']);
@@ -388,10 +476,22 @@ function glp_render_orders_admin_page()
         }
     }
 
+    // Hiển thị thông báo lỗi nếu không có đơn hàng để export
+    if (isset($_GET['export_error']) && $_GET['export_error'] === 'no_orders') {
+        echo '<div class="notice notice-error"><p>Không có đơn hàng nào để export!</p></div>';
+    }
+
     $orders = get_option('glp_orders', array());
 ?>
     <div class="wrap">
         <h1 class="wp-heading-inline">Quản lý Đơn Hàng</h1>
+
+        <!-- Nút Export to Excel -->
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom: 20px;">
+            <input type="hidden" name="action" value="glp_export_orders">
+            <?php wp_nonce_field('glp_export_orders_action'); ?>
+            <button type="submit" class="button button-primary">Export to Excel</button>
+        </form>
 
         <?php if (empty($orders)): ?>
             <div class="notice notice-info">
