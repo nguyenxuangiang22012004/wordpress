@@ -18,6 +18,8 @@ function glp_product_management_init()
     add_action('wp_ajax_nopriv_glp_add_to_cart', 'glp_add_to_cart');
     add_action('wp_ajax_glp_remove_from_cart', 'glp_remove_from_cart');
     add_action('wp_ajax_nopriv_glp_remove_from_cart', 'glp_remove_from_cart');
+    add_action('wp_ajax_glp_update_cart_quantity', 'glp_update_cart_quantity');
+    add_action('wp_ajax_nopriv_glp_update_cart_quantity', 'glp_update_cart_quantity');
 }
 add_action('init', 'glp_product_management_init');
 
@@ -44,7 +46,7 @@ function glp_add_to_cart()
     if (isset($products[$product_id])) {
         $cart = $_SESSION['glp_cart'];
         if (isset($cart[$product_id])) {
-            $cart[$product_id]['quantity'] += 1; // Tăng số lượng nếu sản phẩm đã có trong giỏ
+            $cart[$product_id]['quantity'] += 1;
         } else {
             $cart[$product_id] = array(
                 'product_id' => $product_id,
@@ -77,6 +79,39 @@ function glp_remove_from_cart()
     wp_die();
 }
 
+// Xử lý cập nhật số lượng sản phẩm trong giỏ hàng
+function glp_update_cart_quantity()
+{
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'glp_cart_nonce')) {
+        wp_send_json_error(array('message' => 'Yêu cầu không hợp lệ.'));
+        wp_die();
+    }
+
+    $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : -1;
+    $quantity = isset($_POST['quantity']) ? max(1, intval($_POST['quantity'])) : 1;
+    $cart = $_SESSION['glp_cart'];
+
+    if (isset($cart[$product_id])) {
+        $cart[$product_id]['quantity'] = $quantity;
+        $_SESSION['glp_cart'] = $cart;
+        $subtotal = $cart[$product_id]['price'] * $quantity;
+
+        $total_price = 0;
+        foreach ($cart as $item) {
+            $total_price += $item['price'] * $item['quantity'];
+        }
+
+        wp_send_json_success(array(
+            'message' => 'Đã cập nhật số lượng!',
+            'subtotal' => number_format($subtotal, 0, ',', '.') . ' VNĐ',
+            'total_price' => number_format($total_price, 0, ',', '.') . ' VNĐ'
+        ));
+    } else {
+        wp_send_json_error(array('message' => 'Sản phẩm không tồn tại trong giỏ hàng.'));
+    }
+    wp_die();
+}
+
 // Hiển thị danh sách sản phẩm frontend
 function glp_render_products()
 {
@@ -88,12 +123,10 @@ function glp_render_products()
         delete_transient('glp_order_form_errors');
     }
 
-    // Xử lý tìm kiếm
     $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
     if (!empty($search_query)) {
         $filtered_products = array();
         foreach ($products as $index => $product) {
-            // Tìm kiếm theo tên hoặc mô tả (không phân biệt hoa thường)
             if (
                 stripos($product['name'], $search_query) !== false ||
                 stripos($product['description'], $search_query) !== false
@@ -104,7 +137,6 @@ function glp_render_products()
         $products = $filtered_products;
     }
 
-    // Load template
     ob_start();
     include GLP_PLUGIN_DIR . 'includes/modules/product-management/templates/products.php';
     return ob_get_clean();
@@ -113,22 +145,18 @@ function glp_render_products()
 // Xử lý đặt hàng từ giỏ hàng
 function glp_handle_order_submit()
 {
-    // Bắt đầu output buffering để tránh lỗi headers already sent
     ob_start();
 
-    // Kiểm tra nonce
     if (!isset($_POST['glp_order_nonce']) || !wp_verify_nonce($_POST['glp_order_nonce'], 'glp_order_form_nonce')) {
         set_transient('glp_order_form_errors', ['Yêu cầu không hợp lệ. Vui lòng thử lại.'], 30);
         wp_redirect(add_query_arg('order_error', '1', wp_get_referer()));
         exit;
     }
 
-    // Lấy thông tin cá nhân
     $customer_name = sanitize_text_field($_POST['customer_name']);
     $customer_phone = sanitize_text_field($_POST['customer_phone']);
     $customer_address = sanitize_textarea_field($_POST['customer_address']);
 
-    // Validate thông tin cá nhân
     $errors = [];
     if (empty($customer_name) || strlen($customer_name) < 2 || strlen($customer_name) > 50) {
         $errors[] = 'Vui lòng nhập tên hợp lệ (2-50 ký tự).';
@@ -140,20 +168,17 @@ function glp_handle_order_submit()
         $errors[] = 'Địa chỉ phải từ 10-500 ký tự.';
     }
 
-    // Kiểm tra giỏ hàng
     $cart = $_SESSION['glp_cart'];
     if (empty($cart)) {
         $errors[] = 'Giỏ hàng của bạn đang trống. Vui lòng thêm sản phẩm trước khi đặt hàng.';
     }
 
-    // Nếu có lỗi, lưu vào transient và redirect
     if (!empty($errors)) {
         set_transient('glp_order_form_errors', $errors, 30);
         wp_redirect(add_query_arg('order_error', '1', wp_get_referer()));
         exit;
     }
 
-    // Lưu đơn hàng vào wp_options
     $order = array(
         'products' => $cart,
         'customer_name' => $customer_name,
@@ -167,7 +192,6 @@ function glp_handle_order_submit()
     $orders[] = $order;
     update_option('glp_orders', $orders);
 
-    // Gửi email thông báo
     $to = get_option('admin_email');
     $subject = 'Có đơn hàng mới từ website';
     $message_email = "Thông tin đơn hàng mới:\n\n";
@@ -185,10 +209,8 @@ function glp_handle_order_submit()
     $message_email .= "Ngày đặt: {$order['date']}\n";
     wp_mail($to, $subject, $message_email);
 
-    // Xóa giỏ hàng sau khi đặt hàng thành công
     $_SESSION['glp_cart'] = array();
 
-    // Redirect với thông báo thành công
     wp_redirect(add_query_arg('order_submitted', '1', wp_get_referer()));
     exit;
 }
@@ -196,7 +218,6 @@ function glp_handle_order_submit()
 // Hiển thị trang quản lý sản phẩm trong admin
 function glp_render_products_admin_page()
 {
-    // Xử lý thêm/sửa sản phẩm
     if (isset($_POST['glp_add_product']) && check_admin_referer('glp_add_product_action')) {
         $name = sanitize_text_field($_POST['product_name']);
         $price = floatval($_POST['product_price']);
@@ -227,7 +248,6 @@ function glp_render_products_admin_page()
         }
     }
 
-    // Xử lý xóa sản phẩm
     if (isset($_POST['glp_delete_product']) && check_admin_referer('glp_delete_product_action')) {
         $products = get_option('glp_products', array());
         $index = intval($_POST['product_index']);
@@ -239,7 +259,6 @@ function glp_render_products_admin_page()
         }
     }
 
-    // Hiển thị danh sách sản phẩm
     $products = get_option('glp_products', array());
     $edit_product = null;
     if (isset($_GET['edit_product'])) {
@@ -358,7 +377,6 @@ function glp_render_products_admin_page()
 // Hiển thị trang quản lý đơn hàng trong admin
 function glp_render_orders_admin_page()
 {
-    // Xử lý xóa đơn hàng
     if (isset($_POST['glp_delete_order']) && check_admin_referer('glp_delete_order_action')) {
         $orders = get_option('glp_orders', array());
         $index = intval($_POST['order_index']);
@@ -370,7 +388,6 @@ function glp_render_orders_admin_page()
         }
     }
 
-    // Hiển thị danh sách đơn hàng
     $orders = get_option('glp_orders', array());
 ?>
     <div class="wrap">
@@ -454,7 +471,9 @@ function glp_product_management_enqueue_scripts()
         wp_enqueue_style('bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css', array(), '5.0.2');
         wp_enqueue_script('bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js', array('jquery'), '5.0.2', true);
 
-        // Load script xử lý giỏ hàng
+        // Log để kiểm tra đường dẫn
+        error_log('Cart.js URL: ' . plugin_dir_url(__FILE__) . 'cart.js');
+
         wp_enqueue_script('glp-cart', plugin_dir_url(__FILE__) . 'cart.js', array('jquery'), '1.0', true);
         wp_localize_script('glp-cart', 'glp_cart_params', array(
             'ajax_url' => admin_url('admin-ajax.php'),

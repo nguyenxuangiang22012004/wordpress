@@ -104,8 +104,14 @@ $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : 
                                     <tr>
                                         <td><?php echo esc_html($item['name']); ?></td>
                                         <td><?php echo number_format($item['price'], 0, ',', '.'); ?> VNĐ</td>
-                                        <td><?php echo $item['quantity']; ?></td>
-                                        <td><?php echo number_format($subtotal, 0, ',', '.'); ?> VNĐ</td>
+                                        <td>
+                                            <div class="quantity-control d-flex align-items-center justify-content-center">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary decrease-quantity" data-product-id="<?php echo $item['product_id']; ?>">-</button>
+                                                <input type="text" class="form-control quantity-input mx-2" data-product-id="<?php echo $item['product_id']; ?>" value="<?php echo $item['quantity']; ?>" min="1" style="width: 60px; text-align: center;">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary increase-quantity" data-product-id="<?php echo $item['product_id']; ?>">+</button>
+                                            </div>
+                                        </td>
+                                        <td class="subtotal"><?php echo number_format($subtotal, 0, ',', '.'); ?> VNĐ</td>
                                         <td>
                                             <button type="button" class="btn btn-danger btn-sm remove-from-cart" data-product-id="<?php echo $item['product_id']; ?>">Xóa</button>
                                         </td>
@@ -113,7 +119,7 @@ $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : 
                                 <?php endforeach; ?>
                                 <tr>
                                     <td colspan="3" class="text-end"><strong>Tổng Tiền:</strong></td>
-                                    <td colspan="2"><?php echo number_format($total_price, 0, ',', '.'); ?> VNĐ</td>
+                                    <td colspan="2" id="total-price"><?php echo number_format($total_price, 0, ',', '.'); ?> VNĐ</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -142,7 +148,19 @@ $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : 
             </div>
         </div>
     </div>
+
+    <!-- Tải cart.js thủ công để kiểm tra -->
+    <script src="<?php echo plugin_dir_url(__FILE__) . '../cart.js'; ?>"></script>
 </div>
+
+<!-- Script kiểm tra file cart.js -->
+<script>
+    if (typeof glp_cart_params === 'undefined') {
+        console.error('glp_cart_params is not defined. Check if cart.js is loaded.');
+    } else {
+        console.log('cart.js loaded successfully. AJAX URL:', glp_cart_params.ajax_url);
+    }
+</script>
 
 <!-- CSS tùy chỉnh -->
 <style>
@@ -173,9 +191,39 @@ $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : 
         color: #dc3545 !important;
     }
 
+    .quantity-control {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .quantity-input {
+        width: 60px;
+        text-align: center;
+        border-radius: 5px;
+    }
+
+    .decrease-quantity,
+    .increase-quantity {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
     @media (max-width: 576px) {
         .product-card {
             margin: 0 auto;
+        }
+
+        .quantity-control {
+            justify-content: center;
+        }
+
+        .quantity-input {
+            width: 50px;
         }
     }
 </style>
