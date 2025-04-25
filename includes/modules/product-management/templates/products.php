@@ -141,6 +141,22 @@ $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : 
                                 <label for="customer_address" class="form-label">Địa Chỉ <span class="text-danger">*</span></label>
                                 <textarea class="form-control" id="customer_address" name="customer_address" rows="3" required></textarea>
                             </div>
+                            <!-- Thêm trường chọn phương thức thanh toán -->
+                            <div class="mb-3">
+                                <label class="form-label">Phương Thức Thanh Toán <span class="text-danger">*</span></label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="payment_cod" value="cod" checked>
+                                    <label class="form-check-label" for="payment_cod">
+                                        Ship COD
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="payment_online" value="online">
+                                    <label class="form-check-label" for="payment_online">
+                                        Thanh toán online (VNPay)
+                                    </label>
+                                </div>
+                            </div>
                             <button type="submit" class="btn btn-primary w-100">Xác Nhận Đặt Hàng</button>
                         </form>
                     <?php endif; ?>
