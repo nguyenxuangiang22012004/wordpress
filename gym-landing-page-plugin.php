@@ -99,3 +99,31 @@ class GymLandingPlugin
 
 // Khởi chạy plugin
 GymLandingPlugin::get_instance();
+
+// Tạo bảng orders khi kích hoạt plugin
+function glp_create_orders_table()
+{
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+    $charset_collate = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE $table_name (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_id BIGINT(20) UNSIGNED NOT NULL,
+        products LONGTEXT NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(20) NOT NULL,
+        customer_address TEXT NOT NULL,
+        date DATETIME NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'new',
+        payment_method VARCHAR(20) NOT NULL,
+        payment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        transaction_id VARCHAR(50) DEFAULT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY order_id (order_id)
+    ) $charset_collate;";
+
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+}
+register_activation_hook(__FILE__, 'glp_create_orders_table');

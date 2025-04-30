@@ -211,12 +211,60 @@ function glp_create_vnpay_payment_url($order_id, $total_price)
 
     return $vnp_Url;
 }
+function glp_test_update_order()
+{
+    if (isset($_GET['test_update_order']) && current_user_can('manage_options')) {
+        $order_id = 7;
 
-// Xử lý callback từ VNPay
+        // Lấy thông tin kết nối từ wp-config.php
+        $db_host = DB_HOST;
+        $db_user = DB_USER;
+        $db_password = DB_PASSWORD;
+        $db_name = DB_NAME;
+
+        // Tạo kết nối trực tiếp
+        $conn = new mysqli($db_host, $db_user, $db_password, $db_name);
+        if ($conn->connect_error) {
+            error_log('Direct connection failed: ' . $conn->connect_error);
+            return;
+        }
+        error_log('Direct connection successful');
+
+        // Chuẩn bị truy vấn
+        $table_name = $GLOBALS['wpdb']->prefix . 'glp_orders';
+        $stmt = $conn->prepare("UPDATE $table_name SET payment_status = ?, transaction_id = ? WHERE order_id = ?");
+        $payment_status = 'completed';
+        $transaction_id = '14926811';
+        $stmt->bind_param('ssi', $payment_status, $transaction_id, $order_id);
+
+        // Thực thi truy vấn
+        if ($stmt->execute()) {
+            error_log('Direct mysqli update from admin for Order ID ' . $order_id . ': Success');
+        } else {
+            error_log('Direct mysqli update from admin for Order ID ' . $order_id . ': Failed - ' . $stmt->error);
+        }
+
+        // Đóng kết nối
+        $stmt->close();
+        $conn->close();
+
+        // Kiểm tra dữ liệu sau khi cập nhật (dùng $wpdb để đọc)
+        global $wpdb;
+        $updated_order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE order_id = %d", $order_id), ARRAY_A);
+        error_log('Order data after direct mysqli update for ID ' . $order_id . ': ' . print_r($updated_order, true));
+    }
+}
+add_action('init', 'glp_test_update_order');
 function glp_handle_vnpay_callback()
 {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+
+    error_log('Database prefix: ' . $wpdb->prefix);
+    error_log('Table name: ' . $table_name);
+
     if (isset($_GET['vnpay_return']) && $_GET['vnpay_return'] == '1') {
-        $vnp_HashSecret = "640PQ2BSF3SVBO1O6FC13R29ZWWNUIQW"; // Thay bằng secret của bạn
+        $vnp_HashSecret = "640PQ2BSF3SVBO1O6FC13R29ZWWNUIQW";
         $vnp_SecureHash = $_GET['vnp_SecureHash'];
         $inputData = array();
         foreach ($_GET as $key => $value) {
@@ -238,34 +286,61 @@ function glp_handle_vnpay_callback()
         }
         $secureHash = hash_hmac("sha512", $hashData, $vnp_HashSecret);
 
-        // Debug callback
         error_log('VNPay Callback Data: ' . print_r($inputData, true));
         error_log('VNPay Secure Hash: ' . $vnp_SecureHash . ' | Calculated: ' . $secureHash);
 
         if ($secureHash == $vnp_SecureHash) {
             if ($_GET['vnp_ResponseCode'] == '00') {
-                $order_id = explode('_', $_GET['vnp_TxnRef'])[1]; // Lấy order_id từ vnp_TxnRef
-                $orders = get_option('glp_orders', array());
-                if (isset($orders[$order_id])) {
-                    $orders[$order_id]['payment_status'] = 'completed';
-                    update_option('glp_orders', $orders);
+                $order_id = explode('_', $_GET['vnp_TxnRef'])[1];
+                error_log('Extracted Order ID: ' . $order_id);
+                error_log('vnp_TransactionNo: ' . $_GET['vnp_TransactionNo']);
+
+                $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+                error_log('Table exists: ' . ($table_exists ? 'Yes' : 'No'));
+
+                $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE order_id = %d", $order_id), ARRAY_A);
+                error_log('Order data for ID ' . $order_id . ': ' . print_r($order, true));
+
+                if ($order) {
+                    // Sử dụng $wpdb->query() thay vì $wpdb->update()
+                    $result = $wpdb->query(
+                        $wpdb->prepare(
+                            "UPDATE $table_name SET payment_status = %s, transaction_id = %s WHERE order_id = %d",
+                            'completed',
+                            $_GET['vnp_TransactionNo'],
+                            $order_id
+                        )
+                    );
+                    error_log('Direct SQL update result for Order ID ' . $order_id . ': ' . ($result !== false ? 'Success' : 'Failed'));
+                    if ($result === false) {
+                        error_log('wpdb last error (direct SQL): ' . $wpdb->last_error);
+                    }
+
+                    $updated_order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE order_id = %d", $order_id), ARRAY_A);
+                    error_log('Order data after direct SQL update for ID ' . $order_id . ': ' . print_r($updated_order, true));
+                } else {
+                    error_log('Order not found for ID: ' . $order_id);
                 }
                 wp_redirect(add_query_arg('order_submitted', '1', home_url()));
                 exit;
             } else {
+                error_log('Payment failed with ResponseCode: ' . $_GET['vnp_ResponseCode']);
                 wp_redirect(add_query_arg('order_error', 'payment_failed', home_url()));
                 exit;
             }
         } else {
+            error_log('Invalid signature');
             wp_redirect(add_query_arg('order_error', 'invalid_signature', home_url()));
             exit;
         }
     }
 }
 
-// Xử lý đặt hàng từ giỏ hàng
 function glp_handle_order_submit()
 {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+
     ob_start();
 
     if (!isset($_POST['glp_order_nonce']) || !wp_verify_nonce($_POST['glp_order_nonce'], 'glp_order_form_nonce')) {
@@ -309,23 +384,27 @@ function glp_handle_order_submit()
         $total_price += $item['price'] * $item['quantity'];
     }
 
-    $orders = get_option('glp_orders', array());
-    $order_id = count($orders); // Tạo mã đơn hàng dựa trên số lượng đơn hàng hiện tại
+    $next_order_id = get_option('glp_next_order_id', 1);
+    $order_id = $next_order_id;
+    update_option('glp_next_order_id', $next_order_id + 1);
 
-    $order = array(
-        'order_id' => $order_id,
-        'products' => $cart,
-        'customer_name' => $customer_name,
-        'customer_phone' => $customer_phone,
-        'customer_address' => $customer_address,
-        'date' => current_time('mysql'),
-        'status' => 'new',
-        'payment_method' => $payment_method,
-        'payment_status' => $payment_method === 'cod' ? 'pending' : 'pending' // Trạng thái ban đầu
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'order_id' => $order_id,
+            'products' => maybe_serialize($cart),
+            'customer_name' => $customer_name,
+            'customer_phone' => $customer_phone,
+            'customer_address' => $customer_address,
+            'date' => current_time('mysql'),
+            'status' => 'new',
+            'payment_method' => $payment_method,
+            'payment_status' => $payment_method === 'cod' ? 'pending' : 'pending',
+            'transaction_id' => null
+        ),
+        array('%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
     );
-
-    $orders[$order_id] = $order;
-    update_option('glp_orders', $orders);
+    error_log('Insert order result for ID ' . $order_id . ': ' . ($result !== false ? 'Success' : 'Failed'));
 
     $to = get_option('admin_email');
     $subject = 'Có đơn hàng mới từ website';
@@ -337,14 +416,13 @@ function glp_handle_order_submit()
         $message_email .= "- {$item['name']} (x{$item['quantity']}): " . number_format($subtotal, 0, ',', '.') . " VNĐ\n";
     }
     $message_email .= "Tổng tiền: " . number_format($total_price, 0, ',', '.') . " VNĐ\n\n";
-    $message_email .= "Tên khách hàng: {$order['customer_name']}\n";
-    $message_email .= "Số điện thoại: {$order['customer_phone']}\n";
-    $message_email .= "Địa chỉ: {$order['customer_address']}\n";
+    $message_email .= "Tên khách hàng: $customer_name\n";
+    $message_email .= "Số điện thoại: $customer_phone\n";
+    $message_email .= "Địa chỉ: $customer_address\n";
     $message_email .= "Phương thức thanh toán: " . ($payment_method === 'cod' ? 'Ship COD' : 'Thanh toán online (VNPay)') . "\n";
-    $message_email .= "Ngày đặt: {$order['date']}\n";
+    $message_email .= "Ngày đặt: " . current_time('mysql') . "\n";
     wp_mail($to, $subject, $message_email);
 
-    // Nếu chọn thanh toán online, redirect đến VNPay
     if ($payment_method === 'online') {
         $vnpay_url = glp_create_vnpay_payment_url($order_id, $total_price);
         wp_redirect($vnpay_url);
@@ -356,27 +434,25 @@ function glp_handle_order_submit()
     exit;
 }
 
-// Xử lý export đơn hàng sang Excel
 function glp_handle_export_orders()
 {
-    // Kiểm tra nonce
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+
     if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'glp_export_orders_action')) {
         wp_die('Yêu cầu không hợp lệ.');
     }
 
-    // Kiểm tra quyền truy cập
     if (!current_user_can('manage_options')) {
         wp_die('Bạn không có quyền thực hiện hành động này.');
     }
 
-    $orders = get_option('glp_orders', array());
+    $orders = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC", ARRAY_A);
 
     if (!empty($orders)) {
-        // Tạo spreadsheet mới
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
-        // Đặt tiêu đề cột
         $sheet->setCellValue('A1', 'STT');
         $sheet->setCellValue('B1', 'Mã Đơn Hàng');
         $sheet->setCellValue('C1', 'Sản Phẩm');
@@ -389,22 +465,20 @@ function glp_handle_export_orders()
         $sheet->setCellValue('J1', 'Phương Thức Thanh Toán');
         $sheet->setCellValue('K1', 'Trạng Thái Thanh Toán');
 
-        // Điền dữ liệu
         $row = 2;
         foreach ($orders as $index => $order) {
             $sheet->setCellValue('A' . $row, $index + 1);
             $sheet->setCellValue('B' . $row, '#' . $order['order_id']);
 
-            // Danh sách sản phẩm
+            $products = maybe_unserialize($order['products']);
             $product_list = [];
-            foreach ($order['products'] as $item) {
+            foreach ($products as $item) {
                 $product_list[] = "{$item['name']} (x{$item['quantity']})";
             }
             $sheet->setCellValue('C' . $row, implode(', ', $product_list));
 
-            // Tổng tiền
             $total_price = 0;
-            foreach ($order['products'] as $item) {
+            foreach ($products as $item) {
                 $total_price += $item['price'] * $item['quantity'];
             }
             $sheet->setCellValue('D' . $row, number_format($total_price, 0, ',', '.'));
@@ -419,11 +493,9 @@ function glp_handle_export_orders()
             $row++;
         }
 
-        // Tạo file Excel và gửi về trình duyệt
         $writer = new Xlsx($spreadsheet);
         $filename = 'don-hang-' . date('Y-m-d-H-i-s') . '.xlsx';
 
-        // Đặt header để tải file
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment;filename="' . $filename . '"');
         header('Cache-Control: max-age=0');
@@ -432,43 +504,37 @@ function glp_handle_export_orders()
         header('Cache-Control: cache, must-revalidate');
         header('Pragma: public');
 
-        // Ghi file và thoát
         $writer->save('php://output');
         exit;
     } else {
-        // Nếu không có đơn hàng, redirect về trang trước với thông báo
         wp_redirect(add_query_arg('export_error', 'no_orders', wp_get_referer()));
         exit;
     }
 }
 
-// Xử lý xuất hóa đơn Word
 function glp_handle_export_invoice()
 {
-    // Kiểm tra nonce
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+
     if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'glp_export_invoice_action')) {
         wp_die('Yêu cầu không hợp lệ.');
     }
 
-    // Kiểm tra quyền truy cập
     if (!current_user_can('manage_options')) {
         wp_die('Bạn không có quyền thực hiện hành động này.');
     }
 
-    $order_index = isset($_POST['order_index']) ? intval($_POST['order_index']) : -1;
-    $orders = get_option('glp_orders', array());
+    $order_id = isset($_POST['order_index']) ? intval($_POST['order_index']) : -1;
+    $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE order_id = %d", $order_id), ARRAY_A);
 
-    if (!isset($orders[$order_index])) {
+    if (!$order) {
         wp_die('Đơn hàng không tồn tại.');
     }
 
-    $order = $orders[$order_index];
-
-    // Tạo file Word bằng PHPWord
     $phpWord = new PhpWord();
     $section = $phpWord->addSection();
 
-    // Tiêu đề hóa đơn
     $section->addText('HÓA ĐƠN MUA HÀNG', ['bold' => true, 'size' => 16], ['alignment' => 'center']);
     $section->addTextBreak(1);
     $section->addText('Mã đơn hàng: #' . $order['order_id'], ['size' => 12]);
@@ -480,7 +546,6 @@ function glp_handle_export_invoice()
     $section->addText('Trạng thái thanh toán: ' . ($order['payment_status'] === 'completed' ? 'Đã thanh toán' : 'Chưa thanh toán'), ['size' => 12]);
     $section->addTextBreak(1);
 
-    // Bảng sản phẩm
     $table = $section->addTable(['borderSize' => 1, 'borderColor' => '000000']);
     $table->addRow();
     $table->addCell(2000)->addText('Sản Phẩm', ['bold' => true]);
@@ -488,8 +553,9 @@ function glp_handle_export_invoice()
     $table->addCell(2000)->addText('Giá (VNĐ)', ['bold' => true]);
     $table->addCell(2000)->addText('Thành Tiền (VNĐ)', ['bold' => true]);
 
+    $products = maybe_unserialize($order['products']);
     $total_price = 0;
-    foreach ($order['products'] as $item) {
+    foreach ($products as $item) {
         $subtotal = $item['price'] * $item['quantity'];
         $total_price += $subtotal;
         $table->addRow();
@@ -499,7 +565,6 @@ function glp_handle_export_invoice()
         $table->addCell(2000)->addText(number_format($subtotal, 0, ',', '.'));
     }
 
-    // Nếu đã thanh toán online, thành tiền bằng 0
     if ($order['payment_status'] === 'completed') {
         $total_price = 0;
     }
@@ -507,7 +572,6 @@ function glp_handle_export_invoice()
     $section->addTextBreak(1);
     $section->addText('Tổng tiền: ' . number_format($total_price, 0, ',', '.') . ' VNĐ', ['bold' => true]);
 
-    // Xuất file Word
     $filename = 'hoa-don-' . $order['order_id'] . '-' . date('Y-m-d-H-i-s') . '.docx';
     header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     header('Content-Disposition: attachment;filename="' . $filename . '"');
@@ -516,7 +580,6 @@ function glp_handle_export_invoice()
     $writer->save('php://output');
     exit;
 }
-
 // Hiển thị trang quản lý sản phẩm trong admin
 function glp_render_products_admin_page()
 {
@@ -676,32 +739,33 @@ function glp_render_products_admin_page()
 <?php
 }
 
-// Hiển thị trang quản lý đơn hàng trong admin
 function glp_render_orders_admin_page()
 {
-    // Xử lý xóa đơn hàng
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'glp_orders';
+
     if (isset($_POST['glp_delete_order']) && check_admin_referer('glp_delete_order_action')) {
-        $orders = get_option('glp_orders', array());
-        $index = intval($_POST['order_index']);
-        if (isset($orders[$index])) {
-            unset($orders[$index]);
-            $orders = array_values($orders);
-            update_option('glp_orders', $orders);
+        $order_id = intval($_POST['order_index']);
+        $result = $wpdb->delete(
+            $table_name,
+            array('order_id' => $order_id),
+            array('%d')
+        );
+        error_log('Delete order result for ID ' . $order_id . ': ' . ($result !== false ? 'Success' : 'Failed'));
+        if ($result !== false) {
             echo '<div class="notice notice-success"><p>Đã xóa đơn hàng thành công!</p></div>';
         }
     }
 
-    // Hiển thị thông báo lỗi nếu không có đơn hàng để export
     if (isset($_GET['export_error']) && $_GET['export_error'] === 'no_orders') {
         echo '<div class="notice notice-error"><p>Không có đơn hàng nào để export!</p></div>';
     }
 
-    $orders = get_option('glp_orders', array());
+    $orders = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id DESC", ARRAY_A);
 ?>
     <div class="wrap">
         <h1 class="wp-heading-inline">Quản lý Đơn Hàng</h1>
 
-        <!-- Nút Export to Excel -->
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom: 20px;">
             <input type="hidden" name="action" value="glp_export_orders">
             <?php wp_nonce_field('glp_export_orders_action'); ?>
@@ -736,8 +800,9 @@ function glp_render_orders_admin_page()
                             <td>#<?php echo esc_html($order['order_id']); ?></td>
                             <td>
                                 <?php
+                                $products = maybe_unserialize($order['products']);
                                 $product_list = [];
-                                foreach ($order['products'] as $item) {
+                                foreach ($products as $item) {
                                     $product_list[] = "{$item['name']} (x{$item['quantity']})";
                                 }
                                 echo esc_html(implode(', ', $product_list));
@@ -746,7 +811,7 @@ function glp_render_orders_admin_page()
                             <td>
                                 <?php
                                 $total_price = 0;
-                                foreach ($order['products'] as $item) {
+                                foreach ($products as $item) {
                                     $total_price += $item['price'] * $item['quantity'];
                                 }
                                 echo number_format($total_price, 0, ',', '.');
@@ -763,14 +828,14 @@ function glp_render_orders_admin_page()
                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display: inline;">
                                     <input type="hidden" name="action" value="glp_export_invoice">
                                     <?php wp_nonce_field('glp_export_invoice_action'); ?>
-                                    <input type="hidden" name="order_index" value="<?php echo $index; ?>">
+                                    <input type="hidden" name="order_index" value="<?php echo $order['order_id']; ?>">
                                     <button type="submit" class="button button-primary">Xuất Hóa Đơn</button>
                                 </form>
                             </td>
                             <td>
                                 <form method="post">
                                     <?php wp_nonce_field('glp_delete_order_action'); ?>
-                                    <input type="hidden" name="order_index" value="<?php echo $index; ?>">
+                                    <input type="hidden" name="order_index" value="<?php echo $order['order_id']; ?>">
                                     <button type="submit" name="glp_delete_order" class="button button-secondary" onclick="return confirm('Bạn chắc chắn muốn xóa đơn hàng này?');">
                                         Xóa
                                     </button>
